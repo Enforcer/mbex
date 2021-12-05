@@ -1,9 +1,10 @@
 import abc
+import asyncio
 import time
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Tuple, Type
+from typing import Tuple, Type, Protocol, Callable, Any
 
 from attr import define
 
@@ -65,6 +66,13 @@ def clear() -> None:
     MARKETS.clear()
 
 
+class TasksScheduler(Protocol):
+    def add_task(
+        self, func: Callable, *args: Any, **kwargs: Any
+    ) -> None:
+        ...
+
+
 async def place_order(
     market: Market,
     price: Decimal,
@@ -72,6 +80,7 @@ async def place_order(
     side: Side,
     user_id: auth.UserId,
     order_id: str,
+    tasks: TasksScheduler,
 ) -> None:
     order_cls: Type[LimitOrder]
     if side == Side.bid:
@@ -159,7 +168,7 @@ class NoSuchOrder(Exception):
     pass
 
 
-async def cancel_order(market: Market, user_id: auth.UserId, order_id: str) -> None:
+async def cancel_order(market: Market, user_id: auth.UserId, order_id: str, tasks: TasksScheduler) -> None:
     try:
         order = [
             o

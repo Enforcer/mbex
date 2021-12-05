@@ -3,6 +3,7 @@ import time
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Response
+from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -25,12 +26,18 @@ async def cancel_order(
     user_id: auth.UserId = Depends(current_user_id),
 ) -> Response:
     market = _market_from_str(market)
+    tasks = BackgroundTasks()
     try:
-        await trading.cancel_order(market=market, user_id=user_id, order_id=order_id)
+        await trading.cancel_order(
+            market=market,
+            user_id=user_id,
+            order_id=order_id,
+            tasks=tasks,
+        )
     except trading.NoSuchOrder:
         return Response(status_code=404)
 
-    return Response(status_code=202)
+    return Response(status_code=202, background=tasks)
 
 
 @trading_router.post("/{market}/orders")
@@ -41,6 +48,7 @@ async def place_order(
 ) -> Response:
     market = _market_from_str(market)
     order_id = f"{user_id}-{time.time()}-{os.getpid()}"
+    tasks = BackgroundTasks()
     await trading.place_order(
         market=market,
         price=order.price,
@@ -48,9 +56,10 @@ async def place_order(
         side=order.side,
         user_id=user_id,
         order_id=order_id,
+        tasks=tasks,
     )
 
-    return JSONResponse({"order_id": order_id}, status_code=202)
+    return JSONResponse({"order_id": order_id}, status_code=202, background=tasks)
 
 
 @trading_router.get("/{market}/order_book")

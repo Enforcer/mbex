@@ -416,6 +416,20 @@ toml = "*"
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
 
 [[package]]
+name = "pytest-asyncio"
+version = "0.16.0"
+description = "Pytest support for asyncio."
+category = "dev"
+optional = false
+python-versions = ">= 3.6"
+
+[package.dependencies]
+pytest = ">=5.4.0"
+
+[package.extras]
+testing = ["coverage", "hypothesis (>=5.7.1)"]
+
+[[package]]
 name = "pyzmq"
 version = "22.3.0"
 description = "Python bindings for 0MQ"
@@ -539,7 +553,7 @@ standard = ["websockets (>=9.1)", "httptools (>=0.2.0,<0.3.0)", "watchgod (>=0.6
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "b1a268c183d74a24e3cdf2272cc2594de8a8a2a05937e40d1039ed4c564d1d43"
+content-hash = "d8f7b7d75e484eb7242caa2d4e57c54aadbe50bfc2f5d29206612130a0c9d1f0"
 
 [metadata.files]
 aioredis = [
@@ -754,6 +768,10 @@ pyparsing = [
 pytest = [
     {file = "pytest-6.2.5-py3-none-any.whl", hash = "sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134"},
     {file = "pytest-6.2.5.tar.gz", hash = "sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89"},
+]
+pytest-asyncio = [
+    {file = "pytest-asyncio-0.16.0.tar.gz", hash = "sha256:7496c5977ce88c34379df64a66459fe395cd05543f0a2f837016e7144391fcfb"},
+    {file = "pytest_asyncio-0.16.0-py3-none-any.whl", hash = "sha256:5f2a21273c47b331ae6aa5b36087047b4899e40f03f18397c0e65fa5cca54e9b"},
 ]
 pyzmq = [
     {file = "pyzmq-22.3.0-cp310-cp310-macosx_10_15_universal2.whl", hash = "sha256:6b217b8f9dfb6628f74b94bdaf9f7408708cb02167d644edca33f38746ca12dd"},
