@@ -1,6 +1,7 @@
 import time
 import uuid
 import pathlib
+import statistics
 from datetime import timedelta
 
 import requests
@@ -64,7 +65,8 @@ def main() -> None:
         f"Latencies [ms]: {[_s_to_ms(l) for l in cancel_latencies]}\n"
         f"max: {_s_to_ms(max(cancel_latencies))} ms\n"
         f"min: {_s_to_ms(min(cancel_latencies))} ms\n"
-        f"avg: {(sum([l.total_seconds() for l in cancel_latencies]) / len(cancel_latencies)) * 1000:.3f} ms"
+        f"avg: {(sum([l.total_seconds() for l in cancel_latencies]) / len(cancel_latencies)) * 1000:.3f} ms\n"
+        f"std dev: {statistics.stdev([l.total_seconds() * 1000 for l in cancel_latencies]):.3f} ms"
     )
 
     place_order_latencies = []
@@ -102,7 +104,8 @@ def main() -> None:
         f"Latencies [ms]: {[_s_to_ms(l) for l in place_order_latencies]}\n"
         f"max: {_s_to_ms(max(place_order_latencies))} ms\n"
         f"min: {_s_to_ms(min(place_order_latencies))} ms\n"
-        f"avg: {(sum([l.total_seconds() for l in place_order_latencies]) / len(place_order_latencies)) * 1000:.3f} ms"
+        f"avg: {(sum([l.total_seconds() for l in place_order_latencies]) / len(place_order_latencies)) * 1000:.3f} ms\n"
+        f"std dev: {statistics.stdev([l.total_seconds() * 1000 for l in place_order_latencies]):.3f} ms"
     )
 
 
