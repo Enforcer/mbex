@@ -1,7 +1,7 @@
 import abc
 import asyncio
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from decimal import Decimal
 from enum import Enum
 from typing import Tuple, Type, Protocol, Callable, Any
@@ -104,7 +104,7 @@ async def place_order(
         order_id=order_id,
     )
 
-    trades = []
+    trades = deque([])
     other_side_orders = MARKETS[market][other_side]
     while (
         len(other_side_orders) > 0
