@@ -64,11 +64,122 @@ class Market:
 
 def clear() -> None:
     MARKETS.clear()
+    restart_processes()
 
 
 class TasksScheduler(Protocol):
     def add_task(self, func: Callable, *args: Any, **kwargs: Any) -> None:
         ...
+
+
+from multiprocessing import Process, Queue
+
+
+def market_main(in_q: Queue, out_q: Queue) -> None:
+    book = {Side.bid: [], Side.ask: []}
+
+    while True:
+        action, *others = in_q.get()
+        if action == "order_book":
+            asks_volume_by_price = defaultdict(Decimal)
+            for ask in book[Side.ask]:
+                asks_volume_by_price[ask.price] += ask.volume
+
+            bids_volume_by_price = defaultdict(Decimal)
+            for bid in book[Side.bid]:
+                bids_volume_by_price[bid.price] += bid.volume
+
+            out_q.put((asks_volume_by_price, bids_volume_by_price))
+        elif action == "cancel_order":
+            order_id, user_id, market = others
+            try:
+                order = [
+                    o
+                    for o in book[Side.bid]
+                    if (o.order_id, o.user_id) == (order_id, user_id)
+                ].pop()
+                side = Side.bid
+                currency_to_credit = market.quote
+                volume_to_credit = order.price * order.volume
+            except IndexError:
+                try:
+                    order = [
+                        o
+                        for o in book[Side.ask]
+                        if (o.order_id, o.user_id) == (order_id, user_id)
+                    ].pop()
+                except IndexError:
+                    out_q.put(None)
+                    continue
+
+                side = Side.ask
+                currency_to_credit = market.base
+                volume_to_credit = order.volume
+
+            book[side].remove(order)
+
+            out_q.put((currency_to_credit, volume_to_credit))
+        elif action == "place_order":
+            new_order, side, other_side = others
+
+            trades = deque([])
+            other_side_orders = book[other_side]
+            while (
+                len(other_side_orders) > 0
+                and new_order.matches(other_side_orders[0])
+                and new_order.volume > 0
+            ):
+                time.sleep(0.001)  # simulate it's actually CPU heavy
+                other_order: LimitOrder = other_side_orders[0]
+                matched_vol = min(other_order.volume, new_order.volume)
+                other_order.volume -= matched_vol
+                new_order.volume -= matched_vol
+                # remove order present in order book if it was filled completely
+                if other_order.volume == 0:
+                    other_side_orders.remove(other_order)
+
+                if side == side.bid:
+                    bid_price = new_order.price
+                    bid_user_id = new_order.user_id
+                    ask_user_id = other_order.user_id
+                else:
+                    bid_price = other_order.price
+                    bid_user_id = other_order.user_id
+                    ask_user_id = new_order.user_id
+
+                trades.append(
+                    Trade(
+                        price=new_order.price,
+                        volume=matched_vol,
+                        bid_user_id=bid_user_id,
+                        ask_user_id=ask_user_id,
+                        bid_price=bid_price,
+                    )
+                )
+
+            # add new order to the order book if hasn't been filled yet
+            if new_order.volume > 0:
+                book[side].append(new_order)
+                multiplier = -1 if side == side.bid else 1
+                book[side].sort(
+                    key=lambda order: (order.price * multiplier, order.timestamp)
+                )
+
+            out_q.put(trades)
+
+
+MARKET_PROCESS = {}
+def restart_processes():
+    if MARKET_PROCESS:
+        for proc, _in, _out in MARKET_PROCESS.values():
+            proc.kill()
+
+    for market in ["001-002", "003-004", "005-006", "007-008", "009-010", "ETH-BTC"]:
+        in_q = Queue()
+        out_q = Queue()
+        proc = Process(target=market_main, args=(in_q, out_q), daemon=True)
+        MARKET_PROCESS[market] = proc, in_q, out_q
+        proc.start()
 
 
 async def place_order(
@@ -80,6 +191,9 @@ async def place_order(
     order_id: str,
     tasks: TasksScheduler,
 ) -> None:
+    if not MARKET_PROCESS:
+        restart_processes()
+
     order_cls: Type[LimitOrder]
     if side == Side.bid:
         currency = market.quote
@@ -102,47 +216,9 @@ async def place_order(
         order_id=order_id,
     )
 
-    trades = deque([])
-    other_side_orders = MARKETS[market][other_side]
-    while (
-        len(other_side_orders) > 0
-        and new_order.matches(other_side_orders[0])
-        and new_order.volume > 0
-    ):
-        other_order: LimitOrder = other_side_orders[0]
-        matched_vol = min(other_order.volume, new_order.volume)
-        other_order.volume -= matched_vol
-        new_order.volume -= matched_vol
-        # remove order present in order book if it was filled completely
-        if other_order.volume == 0:
-            other_side_orders.remove(other_order)
-
-        if side == side.bid:
-            bid_price = new_order.price
-            bid_user_id = new_order.user_id
-            ask_user_id = other_order.user_id
-        else:
-            bid_price = other_order.price
-            bid_user_id = other_order.user_id
-            ask_user_id = new_order.user_id
-
-        trades.append(
-            Trade(
-                price=new_order.price,
-                volume=matched_vol,
-                bid_user_id=bid_user_id,
-                ask_user_id=ask_user_id,
-                bid_price=bid_price,
-            )
-        )
-
-    # add new order to the order book if hasn't been filled yet
-    if new_order.volume > 0:
-        MARKETS[market][side].append(new_order)
-        multiplier = -1 if side == side.bid else 1
-        MARKETS[market][side].sort(
-            key=lambda order: (order.price * multiplier, order.timestamp)
-        )
+    _proc, in_q, out_q = MARKET_PROCESS[str(market)]
+    in_q.put(("place_order", new_order, side, other_side))
+    trades = out_q.get(timeout=1)
 
     for trade in trades:
         await wallets.credit(
@@ -169,30 +245,16 @@ class NoSuchOrder(Exception):
 async def cancel_order(
     market: Market, user_id: auth.UserId, order_id: str, tasks: TasksScheduler
 ) -> None:
-    try:
-        order = [
-            o
-            for o in MARKETS[market][Side.bid]
-            if (o.order_id, o.user_id) == (order_id, user_id)
-        ].pop()
-        side = Side.bid
-        currency_to_credit = market.quote
-        volume_to_credit = order.price * order.volume
-    except IndexError:
-        try:
-            order = [
-                o
-                for o in MARKETS[market][Side.ask]
-                if (o.order_id, o.user_id) == (order_id, user_id)
-            ].pop()
-        except IndexError:
-            raise NoSuchOrder
+    if not MARKET_PROCESS:
+        restart_processes()
 
-        side = Side.ask
-        currency_to_credit = market.base
-        volume_to_credit = order.volume
-
-    MARKETS[market][side].remove(order)
+    _proc, in_q, out_q = MARKET_PROCESS[str(market)]
+    in_q.put(("cancel_order", order_id, user_id, market))
+    res = out_q.get()
+    if res is None:
+        raise NoSuchOrder
+    else:
+        currency_to_credit, volume_to_credit = res
 
     await wallets.credit(
         user_id=user_id, currency_code=currency_to_credit, amount=volume_to_credit
@@ -200,12 +262,8 @@ async def cancel_order(
 
 
 def order_book(market: Market) -> Tuple[dict[Decimal, Decimal], dict[Decimal, Decimal]]:
-    asks_volume_by_price = defaultdict(Decimal)
-    for ask in MARKETS[market][Side.ask]:
-        asks_volume_by_price[ask.price] += ask.volume
-
-    bids_volume_by_price = defaultdict(Decimal)
-    for bid in MARKETS[market][Side.bid]:
-        bids_volume_by_price[bid.price] += bid.volume
+    _proc, in_q, out_q = MARKET_PROCESS[str(market)]
+    in_q.put(("order_book", ))
+    asks_volume_by_price, bids_volume_by_price = out_q.get()
 
     return asks_volume_by_price, bids_volume_by_price
