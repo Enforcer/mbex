@@ -1,8 +1,8 @@
 from decimal import Decimal
 from typing import Literal
 
-from mbex.auth import UserId
 from mbex import redis
+from mbex.auth import UserId
 
 CurrencyCode = Literal["ETH", "BTC"]
 REDIS_KEY_TPL = "balance_{user_id}_{currency_code}"
@@ -29,15 +29,16 @@ async def balance(user_id: UserId, currency_code: CurrencyCode) -> Decimal:
 async def credit(user_id: UserId, currency_code: CurrencyCode, amount: Decimal) -> None:
     key = REDIS_KEY_TPL.format(user_id=user_id, currency_code=currency_code)
     async with redis.conn() as conn:
-        raw = await conn.get(key)
+        async with conn.lock(key + "_LOCK"):
+            raw = await conn.get(key)
 
-        if raw:
-            balance = Decimal(raw.decode())
-        else:
-            balance = Decimal("0")
+            if raw:
+                balance = Decimal(raw.decode())
+            else:
+                balance = Decimal("0")
 
-        new_balance = balance + amount
-        await conn.set(key, str(new_balance))
+            new_balance = balance + amount
+            await conn.set(key, str(new_balance))
 
 
 class NotEnough(Exception):
@@ -47,15 +48,16 @@ class NotEnough(Exception):
 async def debit(user_id: UserId, currency_code: CurrencyCode, amount: Decimal) -> None:
     key = REDIS_KEY_TPL.format(user_id=user_id, currency_code=currency_code)
     async with redis.conn() as conn:
-        raw = await conn.get(key)
+        async with conn.lock(key + "_LOCK"):
+            raw = await conn.get(key)
 
-        if raw:
-            balance = Decimal(raw.decode())
-        else:
-            balance = Decimal("0")
+            if raw:
+                balance = Decimal(raw.decode())
+            else:
+                balance = Decimal("0")
 
-        if amount > balance:
-            raise NotEnough
-        else:
-            new_balance = balance - amount
-            await conn.set(key, str(new_balance))
+            if amount > balance:
+                raise NotEnough
+            else:
+                new_balance = balance - amount
+                await conn.set(key, str(new_balance))
