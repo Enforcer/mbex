@@ -28,8 +28,13 @@ def main() -> None:
         headers={"Authorization": token},
         json={"amount": "50"},
     ).raise_for_status()
+    requests.post(
+        ROOT + "/wallets/balances/ETH/deposit",
+        headers={"Authorization": token},
+        json={"amount": "50"},
+    ).raise_for_status()
 
-    latencies = []
+    cancel_latencies = []
     for _ in range(10):
         response = requests.post(
             ROOT + "/trading/ETH-BTC/orders",
@@ -52,13 +57,52 @@ def main() -> None:
             timeout=1,
         )
         response.raise_for_status()
-        latencies.append(response.elapsed)
+        cancel_latencies.append(response.elapsed)
 
+    print("=*= CANCEL LATENCIES =*=")
     print(
-        f"Latencies [ms]: {[_s_to_ms(l) for l in latencies]}\n"
-        f"max: {_s_to_ms(max(latencies))} ms\n"
-        f"min: {_s_to_ms(min(latencies))} ms\n"
-        f"avg: {(sum([l.total_seconds() for l in latencies]) / len(latencies)) * 1000:.3f} ms"
+        f"Latencies [ms]: {[_s_to_ms(l) for l in cancel_latencies]}\n"
+        f"max: {_s_to_ms(max(cancel_latencies))} ms\n"
+        f"min: {_s_to_ms(min(cancel_latencies))} ms\n"
+        f"avg: {(sum([l.total_seconds() for l in cancel_latencies]) / len(cancel_latencies)) * 1000:.3f} ms"
+    )
+
+    place_order_latencies = []
+    for _ in range(10):
+        response = requests.post(
+            ROOT + "/trading/ETH-BTC/orders",
+            headers={"Authorization": token},
+            json={
+                "volume": "1",
+                "price": "1",
+                "side": "bid",
+            },
+            timeout=1,
+        )
+        response.raise_for_status()
+        place_order_latencies.append(response.elapsed)
+
+        time.sleep(0.01)
+
+        response = requests.post(
+            ROOT + "/trading/ETH-BTC/orders",
+            headers={"Authorization": token},
+            json={
+                "volume": "1",
+                "price": "1",
+                "side": "ask",
+            },
+            timeout=1,
+        )
+        response.raise_for_status()
+        place_order_latencies.append(response.elapsed)
+
+    print("=*= PLACE ORDER LATENCIES =*=")
+    print(
+        f"Latencies [ms]: {[_s_to_ms(l) for l in place_order_latencies]}\n"
+        f"max: {_s_to_ms(max(place_order_latencies))} ms\n"
+        f"min: {_s_to_ms(min(place_order_latencies))} ms\n"
+        f"avg: {(sum([l.total_seconds() for l in place_order_latencies]) / len(place_order_latencies)) * 1000:.3f} ms"
     )
 
 
