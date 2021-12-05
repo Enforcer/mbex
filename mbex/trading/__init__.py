@@ -71,39 +71,16 @@ class TasksScheduler(Protocol):
         ...
 
 
-async def place_order(
-    market: Market,
-    price: Decimal,
-    volume: Decimal,
-    side: Side,
-    user_id: auth.UserId,
-    order_id: str,
-    tasks: TasksScheduler,
-) -> None:
-    order_cls: Type[LimitOrder]
-    if side == Side.bid:
-        currency = market.quote
-        value = price * volume
-        other_side = Side.ask
-        order_cls = Bid
-    else:
-        currency = market.base
-        value = volume
-        other_side = Side.bid
-        order_cls = Ask
+PROCESSES = {}
 
-    await wallets.debit(user_id, currency, value)
 
-    new_order = order_cls(
-        price=price,
-        timestamp=time.time(),
-        volume=volume,
-        user_id=user_id,
-        order_id=order_id,
-    )
+from concurrent.futures import ProcessPoolExecutor
 
+pool = ProcessPoolExecutor()
+
+
+def _place_order(new_order, side, other_side_orders, this_side_orders):
     trades = deque([])
-    other_side_orders = MARKETS[market][other_side]
     while (
         len(other_side_orders) > 0
         and new_order.matches(other_side_orders[0])
@@ -138,11 +115,57 @@ async def place_order(
 
     # add new order to the order book if hasn't been filled yet
     if new_order.volume > 0:
-        MARKETS[market][side].append(new_order)
+        this_side_orders.append(new_order)
         multiplier = -1 if side == side.bid else 1
-        MARKETS[market][side].sort(
+        this_side_orders.sort(
             key=lambda order: (order.price * multiplier, order.timestamp)
         )
+
+    return trades, this_side_orders, other_side_orders
+
+
+async def place_order(
+    market: Market,
+    price: Decimal,
+    volume: Decimal,
+    side: Side,
+    user_id: auth.UserId,
+    order_id: str,
+    tasks: TasksScheduler,
+) -> None:
+    order_cls: Type[LimitOrder]
+    if side == Side.bid:
+        currency = market.quote
+        value = price * volume
+        other_side = Side.ask
+        order_cls = Bid
+    else:
+        currency = market.base
+        value = volume
+        other_side = Side.bid
+        order_cls = Ask
+
+    await wallets.debit(user_id, currency, value)
+
+    new_order = order_cls(
+        price=price,
+        timestamp=time.time(),
+        volume=volume,
+        user_id=user_id,
+        order_id=order_id,
+    )
+
+    other_side_orders = MARKETS[market][other_side]
+    this_side_orders = MARKETS[market][side]
+    (
+        trades,
+        this_side_orders,
+        other_side_orders,
+    ) = await asyncio.get_event_loop().run_in_executor(
+        pool, _place_order, new_order, side, other_side_orders, this_side_orders
+    )
+    MARKETS[market][other_side] = other_side_orders
+    MARKETS[market][side] = this_side_orders
 
     for trade in trades:
         await wallets.credit(
@@ -166,13 +189,11 @@ class NoSuchOrder(Exception):
     pass
 
 
-async def cancel_order(
-    market: Market, user_id: auth.UserId, order_id: str, tasks: TasksScheduler
-) -> None:
+def _cancel_order(all_orders, order_id, user_id, market):
     try:
         order = [
             o
-            for o in MARKETS[market][Side.bid]
+            for o in all_orders[Side.bid]
             if (o.order_id, o.user_id) == (order_id, user_id)
         ].pop()
         side = Side.bid
@@ -182,7 +203,7 @@ async def cancel_order(
         try:
             order = [
                 o
-                for o in MARKETS[market][Side.ask]
+                for o in all_orders[Side.ask]
                 if (o.order_id, o.user_id) == (order_id, user_id)
             ].pop()
         except IndexError:
@@ -192,7 +213,30 @@ async def cancel_order(
         currency_to_credit = market.base
         volume_to_credit = order.volume
 
-    MARKETS[market][side].remove(order)
+    all_orders[side].remove(order)
+
+    return all_orders, currency_to_credit, volume_to_credit
+
+
+async def cancel_order(
+    market: Market, user_id: auth.UserId, order_id: str, tasks: TasksScheduler
+) -> None:
+    all_orders = MARKETS[market]
+
+    (
+        all_orders,
+        currency_to_credit,
+        volume_to_credit,
+    ) = await asyncio.get_event_loop().run_in_executor(
+        pool,
+        _cancel_order,
+        all_orders,
+        order_id,
+        user_id,
+        market,
+    )
+
+    MARKETS[market] = all_orders
 
     await wallets.credit(
         user_id=user_id, currency_code=currency_to_credit, amount=volume_to_credit
