@@ -1,6 +1,6 @@
 import abc
 import time
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
 from typing import Tuple, Type
@@ -52,7 +52,13 @@ class Trade:
     bid_price: Decimal
 
 
-Market = namedtuple("Market", "base quote")
+@define(frozen=True)
+class Market:
+    base: wallets.CurrencyCode
+    quote: wallets.CurrencyCode
+
+    def __str__(self) -> str:
+        return f"{self.base}-{self.quote}"
 
 
 def clear() -> None:
