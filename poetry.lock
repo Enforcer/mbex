@@ -561,10 +561,21 @@ h11 = ">=0.8"
 [package.extras]
 standard = ["websockets (>=9.1)", "httptools (>=0.2.0,<0.3.0)", "watchgod (>=0.6)", "python-dotenv (>=0.13)", "PyYAML (>=5.1)", "uvloop (>=0.14.0,!=0.15.0,!=0.15.1)", "colorama (>=0.4)"]
 
+[[package]]
+name = "yappi"
+version = "1.3.3"
+description = "Yet Another Python Profiler"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[package.extras]
+test = ["gevent (>=20.6.2)"]
+
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "c1c11da9927d2a1b499283b79cde7f5cdbaae23e3ad3f9fc9078416da200c391"
+content-hash = "99e4cf5414df08c0ced3930f69b66a18a2c55d967e455cff6d844963c8fecfe5"
 
 [metadata.files]
 aioredis = [
@@ -974,4 +985,7 @@ urllib3 = [
 uvicorn = [
     {file = "uvicorn-0.15.0-py3-none-any.whl", hash = "sha256:17f898c64c71a2640514d4089da2689e5db1ce5d4086c2d53699bf99513421c1"},
     {file = "uvicorn-0.15.0.tar.gz", hash = "sha256:d9a3c0dd1ca86728d3e235182683b4cf94cd53a867c288eaeca80ee781b2caff"},
+]
+yappi = [
+    {file = "yappi-1.3.3.tar.gz", hash = "sha256:855890cd9a90d833dd2df632d648de8ccd0a4c3131f1edc8abd004db0625b5e8"},
 ]
