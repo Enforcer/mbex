@@ -29,3 +29,14 @@ async def sleeper() -> None:
 async def no_wait() -> None:
     """Scheduling coroutine to run concurrently in 'background'."""
     asyncio.create_task(asyncio.sleep(5))
+
+
+async def coro() -> None:
+    """Running non-coroutine-friendly code is done with executors."""
+    current_loop = asyncio.get_event_loop()
+    from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+    with ThreadPoolExecutor() as executor:
+        await current_loop.run_in_executor(executor, time.sleep, 10)
+
+    # Default executor, thread-based
+    await current_loop.run_in_executor(None, time.sleep, 10)
