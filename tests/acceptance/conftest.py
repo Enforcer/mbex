@@ -1,12 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from mbex.api.app import app
+from mbex.main import initialize
 
 
 @pytest.fixture()
 def client() -> TestClient:
-    return TestClient(app)
+    return TestClient(initialize())
 
 
 @pytest.fixture()
