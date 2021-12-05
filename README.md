@@ -15,12 +15,12 @@ docker run --rm --name redis -p 6379:6379 redis:latest
 
 # Run server
 ```bash
-uvicorn mbex.main:initialize
+python mbex/run_without_reload.py
 ```
-Optionally, with reload like
+Optionally, with hot-code reload like
 
 ```bash
-uvicorn mbex.main:initialize --reload
+python mbex/run_with_reload.py
 ```
 
 # Checking out API docs
