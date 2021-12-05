@@ -109,6 +109,7 @@ async def place_order(
         and new_order.matches(other_side_orders[0])
         and new_order.volume > 0
     ):
+        time.sleep(0.001)  # simulate it's actually CPU-intensive
         other_order: LimitOrder = other_side_orders[0]
         matched_vol = min(other_order.volume, new_order.volume)
         other_order.volume -= matched_vol
