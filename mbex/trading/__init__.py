@@ -106,6 +106,7 @@ async def place_order(
         matched_vol = min(other_order.volume, new_order.volume)
         other_order.volume -= matched_vol
         new_order.volume -= matched_vol
+        # remove order present in order book if it was filled completely
         if other_order.volume == 0:
             other_side_orders.remove(other_order)
 
@@ -128,6 +129,7 @@ async def place_order(
             )
         )
 
+    # add new order to the order book if hasn't been filled yet
     if new_order.volume > 0:
         MARKETS[market][side].append(new_order)
         multiplier = -1 if side == side.bid else 1
