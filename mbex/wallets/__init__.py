@@ -1,10 +1,9 @@
 from decimal import Decimal
-from typing import Literal
 
 from mbex import redis
 from mbex.auth import UserId
 
-CurrencyCode = Literal["ETH", "BTC"]
+CurrencyCode = str
 REDIS_KEY_TPL = "balance_{user_id}_{currency_code}"
 
 

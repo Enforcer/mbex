@@ -4,7 +4,7 @@ import time
 from collections import defaultdict, deque
 from decimal import Decimal
 from enum import Enum
-from typing import Tuple, Type, Protocol, Callable, Any
+from typing import Any, Callable, Protocol, Tuple, Type
 
 from attr import define
 
@@ -67,9 +67,7 @@ def clear() -> None:
 
 
 class TasksScheduler(Protocol):
-    def add_task(
-        self, func: Callable, *args: Any, **kwargs: Any
-    ) -> None:
+    def add_task(self, func: Callable, *args: Any, **kwargs: Any) -> None:
         ...
 
 
@@ -168,7 +166,9 @@ class NoSuchOrder(Exception):
     pass
 
 
-async def cancel_order(market: Market, user_id: auth.UserId, order_id: str, tasks: TasksScheduler) -> None:
+async def cancel_order(
+    market: Market, user_id: auth.UserId, order_id: str, tasks: TasksScheduler
+) -> None:
     try:
         order = [
             o
