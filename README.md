@@ -1,9 +1,17 @@
-# Install
+# Prerequisites
+## Install
 ```bash
 python3.9 -m venv ve39
 source ve39/bin/activate
 pip install -r requirements.txt
 ```
+
+## Running redis
+Application requires a running redis instance. You can use docker:
+```bash
+docker run --rm --name redis -p 6379:6379 redis:latest
+```
+
 
 # Run server
 ```bash
@@ -14,6 +22,16 @@ Optionally, with reload like
 ```bash
 uvicorn mbex.main:initialize --reload
 ```
+
+# Checking out API docs
+Go to `http://localhost:8000/docs` with server running
+
+# Running tests
+WARNING: start redis first
+```bash
+pytest
+```
+
 
 # Tips
 If you want to line-profile view functions, apply `@profile` decorator first, like:
