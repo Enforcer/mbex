@@ -4,6 +4,8 @@
 python3.9 -m venv ve39
 source ve39/bin/activate
 pip install -r requirements.txt
+pip install poetry
+poetry install
 ```
 
 ## Running redis
