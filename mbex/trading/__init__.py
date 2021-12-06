@@ -217,8 +217,15 @@ async def place_order(
     )
 
     _proc, in_q, out_q = MARKET_PROCESS[str(market)]
-    in_q.put(("place_order", new_order, side, other_side))
-    trades = out_q.get(timeout=1)
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        in_q.put,
+        ("place_order", new_order, side, other_side),
+    )
+    trades = await asyncio.get_event_loop().run_in_executor(
+        None,
+        out_q.get
+    )
 
     for trade in trades:
         await wallets.credit(
